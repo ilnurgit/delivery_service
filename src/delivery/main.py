@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
+from delivery.api.router import router as api_router
 from delivery.core.api.health import router as health_router
-from delivery.parcels.api.router import router as parcels_router
 
 
 def create_app() -> FastAPI:
@@ -10,7 +10,8 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
     app.include_router(health_router)
-    app.include_router(parcels_router)
+    app.include_router(api_router, prefix="/api/v1")
+
     return app
 
 
