@@ -1,6 +1,7 @@
 import uuid
 
 from delivery.parcels.domain.entities import Parcel
+from delivery.parcels.domain.errors import ParcelWeightMustBePositiveError
 from delivery.parcels.repositories.memory import ParcelRepository
 
 
@@ -12,9 +13,13 @@ class ParcelService:
         return await self._repo.list_all()
 
     async def create_parcel(self, parcel_type_id: str, weight_kg: float) -> Parcel:
+        if weight_kg <= 0:
+            raise ParcelWeightMustBePositiveError(weight_kg)
+
         parcel = Parcel(
             id=str(uuid.uuid4()),
             parcel_type_id=parcel_type_id,
             weight_kg=weight_kg,
         )
+
         return await self._repo.create(parcel)
