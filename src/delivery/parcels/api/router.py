@@ -20,7 +20,7 @@ async def create_parcel(
     service: ParcelService = Depends(get_parcel_service),
 ) -> ParcelOut:
     parcel = await service.create_parcel(
-        parcel_type_id=payload.parcel_type_id,
+        parcel_type_code=payload.parcel_type_code,
         weight_kg=payload.weight_kg,
     )
     return to_parcel_out(parcel)
