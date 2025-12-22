@@ -28,11 +28,10 @@ class SqlAlchemyParcelRepository(ParcelRepository):
     async def create(self, parcel: Parcel) -> Parcel:
         model = ParcelModel(
             id=uuid.UUID(parcel.id),
-            parcel_type_id=parcel.parcel_type_id,
+            parcel_type_id=uuid.UUID(parcel.parcel_type_id),
             weight_kg=parcel.weight_kg,
         )
 
         self._session.add(model)
-        await self._session.commit()
-
+        await self._session.flush()
         return parcel
