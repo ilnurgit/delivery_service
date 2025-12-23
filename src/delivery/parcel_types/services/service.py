@@ -14,5 +14,9 @@ class ParcelTypeService:
     async def get_type(self, code: str) -> ParcelType | None:
         return await self._repo.get_by_code(code)
 
-    async def create_type(self, code: str, name: str) -> ParcelType:
-        return await self._repo.create(code=code, name=name)
+    async def create_type(
+        self, code: str, name: str, base_price_usd: str, price_per_kg_usd: str
+    ) -> ParcelType:
+        return await self._repo.create(
+            code=code, name=name, base_price_usd=base_price_usd, price_per_kg_usd=price_per_kg_usd
+        )

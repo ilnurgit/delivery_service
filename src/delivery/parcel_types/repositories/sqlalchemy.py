@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +25,8 @@ class SqlAlchemyParcelTypeRepository(ParcelTypeRepository):
             id=str(row.id),
             code=row.code,
             name=row.name,
+            base_price_usd=str(row.base_price_usd),
+            price_per_kg_usd=str(row.price_per_kg_usd),
         )
 
     async def list_all(self) -> list[ParcelType]:
@@ -33,16 +37,27 @@ class SqlAlchemyParcelTypeRepository(ParcelTypeRepository):
                 id=str(r.id),
                 code=r.code,
                 name=r.name,
+                base_price_usd=str(r.base_price_usd),
+                price_per_kg_usd=str(r.price_per_kg_usd),
             )
             for r in rows
         ]
 
-    async def create(self, code: str, name: str) -> ParcelType:
-        model = ParcelTypeModel(code=code, name=name)
+    async def create(
+        self, code: str, name: str, base_price_usd: str, price_per_kg_usd: str
+    ) -> ParcelType:
+        model = ParcelTypeModel(
+            code=code,
+            name=name,
+            base_price_usd=Decimal(base_price_usd),
+            price_per_kg_usd=Decimal(price_per_kg_usd),
+        )
         self._session.add(model)
         await self._session.flush()
         return ParcelType(
             id=str(model.id),
             code=model.code,
             name=model.name,
+            base_price_usd=str(model.base_price_usd),
+            price_per_kg_usd=str(model.price_per_kg_usd),
         )

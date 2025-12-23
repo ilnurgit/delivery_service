@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -23,4 +24,6 @@ class ParcelTypeModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    base_price_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    price_per_kg_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     parcels: Mapped[list[ParcelModel]] = relationship(back_populates="parcel_type")

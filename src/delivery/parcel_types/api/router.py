@@ -27,7 +27,12 @@ async def create_type(
     payload: ParcelTypeCreate,
     service: ParcelTypeService = Depends(get_service),
 ) -> ParcelTypeOut:
-    pt = await service.create_type(code=payload.code, name=payload.name)
+    pt = await service.create_type(
+        code=payload.code,
+        name=payload.name,
+        base_price_usd=payload.base_price_usd,
+        price_per_kg_usd=payload.price_per_kg_usd,
+    )
     return to_out(pt)
 
 

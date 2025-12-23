@@ -7,11 +7,11 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
-from delivery.core.db.base import Base
-from delivery.core.settings import settings
 
 # ВАЖНО: импорт моделей, чтобы они зарегистрировались в Base.metadata
-from delivery.parcels.db import models as _parcels_models  # noqa: F401
+from delivery.core.db import models  # noqa: F401
+from delivery.core.db.base import Base
+from delivery.core.settings import settings
 
 config = context.config
 
