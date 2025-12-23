@@ -16,3 +16,11 @@ celery_app.conf.result_serializer = "json"
 celery_app.conf.accept_content = ["json"]
 
 celery_app.autodiscover_tasks(["delivery.fx"])
+
+# ---- Beat schedule ----
+celery_app.conf.beat_schedule = {
+    "refresh-usd-rub-every-1-minute": {
+        "task": "fx.refresh_usd_rub",
+        "schedule": 60.0,
+    }
+}
