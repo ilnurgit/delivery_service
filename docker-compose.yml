@@ -17,5 +17,16 @@ services:
       retries: 10
     restart: unless-stopped
 
+  redis:
+    image: redis:8.4.0-alpine3.22
+    container_name: delivery_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   delivery_pgdata:
