@@ -10,7 +10,11 @@ from delivery.core.errors.handlers import (
     http_exception_handler,
     validation_exception_handler,
 )
+from delivery.core.logging import setup_logging
+from delivery.core.middlewares.access_log import AccessLogMiddleware
 from delivery.core.middlewares.trace_id import TraceIdMiddleware
+
+setup_logging()
 
 
 def create_app() -> FastAPI:
@@ -21,6 +25,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(api_router, prefix="/api/v1")
 
+    app.add_middleware(AccessLogMiddleware)
     app.add_middleware(TraceIdMiddleware)
 
     app.add_exception_handler(AppError, app_error_handler)
