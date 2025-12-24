@@ -102,3 +102,4 @@ cache/
 # Local datasets
 data/
 datasets/
+celerybeat-schedule.db

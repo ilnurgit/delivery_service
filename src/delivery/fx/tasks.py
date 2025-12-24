@@ -1,27 +1,27 @@
-from __future__ import annotations
-
 import asyncio
 from decimal import Decimal
 
+from redis.asyncio import Redis
+
 from delivery.core.celery_app import celery_app
-from delivery.core.redis.client import create_redis
+from delivery.core.settings import settings
 from delivery.fx.cache import FxRateCache
-from delivery.fx.provider import FxRateProvider
-from delivery.fx.service import FxService
+from delivery.fx.provider_cbr import CbrXmlDailyProvider
 
 
-async def _refresh_usd_rub() -> None:
-    redis = create_redis()
-    cache = FxRateCache(redis=redis, ttl_seconds=300)
-    fx = FxService(cache=cache, provider=FxRateProvider())
+async def _refresh() -> str:
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    try:
+        cache = FxRateCache(redis=redis, ttl_seconds=60 * 60)
+        provider = CbrXmlDailyProvider()
 
-    rate = await fx.provider.get_rate("USD", "RUB")
-    await cache.set_rate("USD", "RUB", Decimal(rate))
-
-    await redis.aclose()
+        rate: Decimal = await provider.get_rate("USD", "RUB")
+        await cache.set_rate("USD", "RUB", rate)
+        return "ok"
+    finally:
+        await redis.aclose()  # важно: закрыть соединения
 
 
 @celery_app.task(name="fx.refresh_usd_rub")
 def refresh_usd_rub() -> str:
-    asyncio.run(_refresh_usd_rub())
-    return "ok"
+    return asyncio.run(_refresh())
