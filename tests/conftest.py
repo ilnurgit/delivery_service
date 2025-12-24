@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
@@ -35,7 +37,7 @@ def _load_env_and_migrate() -> None:
     subprocess.run(["uv", "run", "alembic", "upgrade", "head"], check=True)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 async def engine() -> AsyncEngine:
     db_url = os.environ["DATABASE_URL"]
     eng = create_async_engine(db_url, echo=False, pool_pre_ping=True)
@@ -45,16 +47,23 @@ async def engine() -> AsyncEngine:
         await eng.dispose()
 
 
-@pytest.fixture
-def session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
-    return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-
 @pytest.fixture(autouse=True)
-async def _clean_db(engine: AsyncEngine) -> None:
-    async with engine.begin() as conn:
-        await conn.exec_driver_sql("TRUNCATE parcels, parcel_types RESTART IDENTITY CASCADE;")
-    yield
+async def db_connection(engine: AsyncEngine) -> AsyncIterator[AsyncConnection]:
+    async with engine.connect() as conn:
+        trans = await conn.begin()
+        try:
+            yield conn
+        finally:
+            await trans.rollback()
+
+
+@pytest.fixture
+def session_factory(db_connection) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(
+        bind=db_connection,
+        class_=AsyncSession,
+        expire_on_commit=False,
+    )
 
 
 @pytest.fixture
@@ -65,7 +74,6 @@ def app(session_factory: async_sessionmaker[AsyncSession]):
         async with session_factory() as session:
             try:
                 yield session
-                await session.commit()
             except Exception:
                 await session.rollback()
                 raise
