@@ -1,7 +1,7 @@
 import uuid
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from delivery.parcel_types.db.models import ParcelTypeModel
@@ -104,3 +104,44 @@ class SqlAlchemyParcelRepository:
                 )
             )
         return out
+
+    async def list_unprocessed_for_costs(self, *, limit: int) -> list[Parcel]:
+        stmt = (
+            select(ParcelModel, ParcelTypeModel)
+            .join(ParcelTypeModel, ParcelModel.parcel_type_id == ParcelTypeModel.id)
+            .where(ParcelModel.delivery_cost_rub.is_(None))
+            .order_by(ParcelModel.created_at.asc())
+            .limit(limit)
+        )
+        res = await self._session.execute(stmt)
+        rows = res.all()
+
+        out: list[Parcel] = []
+        for parcel_row, pt_row in rows:
+            out.append(
+                Parcel(
+                    id=str(parcel_row.id),
+                    session_id=parcel_row.session_id,
+                    parcel_type_id=str(parcel_row.parcel_type_id),
+                    parcel_type_code=pt_row.code,
+                    parcel_type_name=pt_row.name,
+                    title=parcel_row.title,
+                    weight_kg=parcel_row.weight_kg,
+                    content_usd=str(parcel_row.content_usd),
+                    delivery_cost_rub=None,
+                )
+            )
+        return out
+
+    async def set_delivery_costs_rub(self, updates: list[tuple[str, str]]) -> int:
+        # updates: [(parcel_id, "123.45"), ...]
+        updated = 0
+        for pid, cost in updates:
+            stmt = (
+                update(ParcelModel)
+                .where(ParcelModel.id == uuid.UUID(pid), ParcelModel.delivery_cost_rub.is_(None))
+                .values(delivery_cost_rub=Decimal(cost))
+            )
+            res = await self._session.execute(stmt)
+            updated += res.rowcount or 0
+        return updated

@@ -14,6 +14,7 @@ from delivery.core.logging import setup_logging
 from delivery.core.middlewares.access_log import AccessLogMiddleware
 from delivery.core.middlewares.session import SessionMiddleware
 from delivery.core.middlewares.trace_id import TraceIdMiddleware
+from delivery.ui.router import router as ui_router
 
 setup_logging()
 
@@ -25,6 +26,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(api_router, prefix="/api/v1")
+    app.include_router(ui_router)
 
     app.add_middleware(SessionMiddleware)
     app.add_middleware(AccessLogMiddleware)
