@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import subprocess
 from collections.abc import AsyncIterator
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -52,9 +54,22 @@ async def _flush_redis():
     await redis.flushall()
 
 
+async def _truncate_tables() -> None:
+    db_url = os.environ["DATABASE_URL"]
+    eng = create_async_engine(db_url, echo=False, pool_pre_ping=True)
+    try:
+        async with eng.begin() as conn:
+            await conn.execute(
+                text("TRUNCATE TABLE parcel_types, parcels RESTART IDENTITY CASCADE;")
+            )
+    finally:
+        await eng.dispose()
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _migrate() -> None:
     subprocess.run(["uv", "run", "alembic", "upgrade", "head"], check=True)
+    asyncio.run(_truncate_tables())
 
 
 @pytest.fixture(scope="session")

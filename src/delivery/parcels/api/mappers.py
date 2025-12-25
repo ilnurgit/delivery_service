@@ -5,6 +5,7 @@ from delivery.parcels.domain.entities import Parcel
 
 
 def to_parcel_out(parcel: Parcel) -> ParcelOut:
+    display = parcel.delivery_cost_rub if parcel.delivery_cost_rub is not None else "Не рассчитано"
     return ParcelOut(
         id=parcel.id,
         title=parcel.title,
@@ -14,6 +15,7 @@ def to_parcel_out(parcel: Parcel) -> ParcelOut:
         weight_kg=parcel.weight_kg,
         content_usd=parcel.content_usd,
         delivery_cost_rub=parcel.delivery_cost_rub,
+        delivery_cost_rub_display=display,
     )
 
 

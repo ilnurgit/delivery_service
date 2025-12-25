@@ -44,4 +44,13 @@ async def _run_refresh(
 
 @celery_app.task(name="parcels.refresh_delivery_costs")
 def refresh_delivery_costs(batch_size: int = 500) -> int:
-    return asyncio.run(_run_refresh(batch_size=batch_size))
+    async def _run_all() -> int:
+        total = 0
+        while True:
+            updated = await _run_refresh(batch_size=batch_size)
+            if updated == 0:
+                break
+            total += updated
+        return total
+
+    return asyncio.run(_run_all())

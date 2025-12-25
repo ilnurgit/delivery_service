@@ -19,3 +19,4 @@ class ParcelOut(BaseModel):
     weight_kg: float
     content_usd: str
     delivery_cost_rub: str | None = None
+    delivery_cost_rub_display: str
