@@ -30,8 +30,6 @@ jobs:
           REDIS_URL=redis://redis:6379/0
           RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672//
           EOF
-          echo "Created .env:"
-          sed -e 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=*** /' .env
 
       - name: Build and start services (CI)
         run: |
@@ -58,13 +56,19 @@ jobs:
             sleep 2
           done
 
+      - name: Create .env.test inside api container (for pytest conftest)
+        run: |
+          docker compose exec -T api sh -lc 'cat > /app/.env.test << "EOF"
+          DATABASE_URL=postgresql+asyncpg://delivery:delivery@postgres:5432/delivery_test
+          REDIS_URL=redis://redis:6379/0
+          RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672//
+          EOF
+          ls -la /app/.env.test
+          '
+
       - name: Run pytest (inside api container)
         run: |
-          docker compose exec -T \
-            -e DATABASE_URL="postgresql+asyncpg://delivery:delivery@postgres:5432/delivery_test" \
-            -e REDIS_URL="redis://redis:6379/0" \
-            -e RABBITMQ_URL="amqp://guest:guest@rabbitmq:5672//" \
-            api uv run pytest -q
+          docker compose exec -T api uv run pytest -q
 
       - name: Dump logs on failure
         if: failure()
