@@ -5,18 +5,39 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.17.2",
+    "asyncpg>=0.31.0",
+    "celery>=5.4",
     "fastapi>=0.125.0",
+    "greenlet>=3.3.0",
+    "loguru>=0.7.3",
+    "pydantic-settings>=2.12.0",
+    "python-multipart>=0.0.12",
+    "redis>=5",
+    "sqlalchemy>=2.0.45",
     "uvicorn>=0.38.0",
 ]
 
 [dependency-groups]
 dev = [
+    "anyio>=4",
+    "httpx>=0.27",
     "mypy>=1.19.1",
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
     "pytest-asyncio>=1.3.0",
     "ruff>=0.14.10",
 ]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 # -----------------------------
 # ----- КОНФИГУРАЦИЯ RUFF -----
@@ -71,6 +92,7 @@ ignore = [
     "PLR0915",  # слишком большая функция — Ruff не должен тебя ограничивать
     "PLR2004",  # запрет "магических" чисел — в реальной практике мешает
     "E203",
+    "B008",
 ]
 
 # Можно добавить сюда свои игнорируемые правила, если что-то будет мешать
@@ -143,6 +165,16 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 
+markers = [
+  "unit: fast tests without IO (no DB/Redis/HTTP)",
+  "integration: ASGI in-process + DB/Redis",
+  "e2e: real server/network smoke/regression",
+]
+
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
 # Минимальная версия pytest, ниже которой тесты не запустятся
 minversion = "8.0"
 
@@ -154,7 +186,7 @@ testpaths = [
 # Дополнительные опции pytest:
 # -r : показывать короткий отчёт по пропускам/ошибкам
 # -a : показать ВСЕ категории причин (xfail, skip, error, fail)
-addopts = "-ra"
+addopts = "-ra --strict-markers --strict-config"
 
 # Какие файлы считать тестовыми (по шаблону)
 python_files = ["test_*.py"]

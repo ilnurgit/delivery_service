@@ -102,3 +102,8 @@ cache/
 # Local datasets
 data/
 datasets/
+celerybeat-schedule*
+*.db
+PROJECT_DUMP.md
+make_dump.py
+celerybeat-schedule.db
