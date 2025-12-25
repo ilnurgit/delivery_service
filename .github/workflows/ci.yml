@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ----- Lint (pre-commit) -----
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install --no-cache-dir uv
+
+      - name: Install deps (uv)
+        run: uv sync --frozen
+
+      - name: Run pre-commit
+        run: uv run pre-commit run --all-files
+
+      # ----- Tests in Docker -----
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and start compose
+        env:
+          POSTGRES_DB: delivery
+          POSTGRES_USER: delivery
+          POSTGRES_PASSWORD: delivery
+          POSTGRES_PORT: 5432
+          RABBITMQ_DEFAULT_USER: guest
+          RABBITMQ_DEFAULT_PASS: guest
+        run: |
+          docker compose up -d --build postgres redis rabbitmq migrate api
+          docker compose ps
+
+      - name: Wait for services health
+        run: |
+          docker compose ps
+          # Подстрахуемся: иногда healthcheck не успевает
+          for i in {1..30}; do
+            pg=$(docker inspect -f '{{.State.Health.Status}}' delivery_postgres 2>/dev/null || echo "unknown")
+            rd=$(docker inspect -f '{{.State.Health.Status}}' delivery_redis 2>/dev/null || echo "unknown")
+            rmq=$(docker inspect -f '{{.State.Health.Status}}' delivery_rabbitmq 2>/dev/null || echo "unknown")
+            echo "postgres=$pg redis=$rd rabbitmq=$rmq"
+            if [ "$pg" = "healthy" ] && [ "$rd" = "healthy" ] && [ "$rmq" = "healthy" ]; then
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run pytest inside api container
+        env:
+          # ВАЖНО: внутри docker сети БД доступна по сервису "postgres:5432"
+          DATABASE_URL: postgresql+asyncpg://delivery:delivery@postgres:5432/delivery_test
+          REDIS_URL: redis://redis:6379/0
+          RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+        run: |
+          docker compose exec -T \
+            -e DATABASE_URL="${DATABASE_URL}" \
+            -e REDIS_URL="${REDIS_URL}" \
+            -e RABBITMQ_URL="${RABBITMQ_URL}" \
+            api uv run pytest -q
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --no-color --tail=300
+
+      - name: Shutdown
+        if: always()
+        run: docker compose down -v
