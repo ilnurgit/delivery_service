@@ -34,4 +34,7 @@ class ParcelModel(Base):
     content_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     delivery_cost_rub: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 
-    parcel_type: Mapped[ParcelTypeModel] = relationship(back_populates="parcels")
+    parcel_type: Mapped[ParcelTypeModel] = relationship(
+        "ParcelTypeModel",
+        back_populates="parcels",
+    )

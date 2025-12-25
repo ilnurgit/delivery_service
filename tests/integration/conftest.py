@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
@@ -17,8 +18,6 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-
-from delivery.core.redis.client import redis
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -31,8 +30,12 @@ def _load_env_test() -> None:
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue
+
         k, v = stripped.split("=", 1)
-        os.environ[k.strip()] = v.strip()
+        k = k.strip()
+        v = v.strip()
+
+        os.environ.setdefault(k, v)
 
 
 _load_env_test()
@@ -49,9 +52,13 @@ class FakeFxService:
 
 @pytest.fixture(autouse=True)
 async def _flush_redis():
-    await redis.flushall()
-    yield
-    await redis.flushall()
+    r = Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
+    await r.flushall()
+    try:
+        yield
+    finally:
+        await r.flushall()
+        await r.aclose()
 
 
 async def _truncate_tables() -> None:
@@ -89,7 +96,8 @@ async def db_connection(engine: AsyncEngine) -> AsyncIterator[AsyncConnection]:
         try:
             yield conn
         finally:
-            await trans.rollback()
+            if trans.is_active:
+                await trans.rollback()
 
 
 @pytest.fixture

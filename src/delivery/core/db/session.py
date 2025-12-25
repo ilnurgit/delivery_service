@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from delivery.core.db import models  # noqa: F401
 from delivery.core.db.engine import engine
 
 async_session_factory = async_sessionmaker(

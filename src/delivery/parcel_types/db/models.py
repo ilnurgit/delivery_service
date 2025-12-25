@@ -26,4 +26,7 @@ class ParcelTypeModel(Base):
     )
     base_price_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     price_per_kg_usd: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
-    parcels: Mapped[list[ParcelModel]] = relationship(back_populates="parcel_type")
+    parcels: Mapped[list[ParcelModel]] = relationship(
+        "ParcelModel",
+        back_populates="parcel_type",
+    )

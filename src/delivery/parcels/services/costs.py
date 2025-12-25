@@ -1,20 +1,30 @@
 from __future__ import annotations
 
 from decimal import ROUND_HALF_UP, Decimal
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from delivery.core.db.session import async_session_factory
 from delivery.parcels.db.models import ParcelModel
+
+if TYPE_CHECKING:
+    pass
 
 
 class ParcelCostRefresher:
     def __init__(
-        self, fx, session_factory: async_sessionmaker[AsyncSession] = async_session_factory
+        self,
+        fx,
+        session_factory: async_sessionmaker[AsyncSession] | None = None,
     ):
         self._fx = fx
         self._session_factory = session_factory
+
+    def _get_default_factory(self) -> async_sessionmaker[AsyncSession]:
+        from delivery.core.db.session import async_session_factory  # noqa: PLC0415
+
+        return async_session_factory
 
     async def refresh_unprocessed(
         self,
@@ -25,7 +35,8 @@ class ParcelCostRefresher:
         if session is not None:
             return await self._refresh(session, batch_size=batch_size)
 
-        async with self._session_factory() as s:
+        factory = self._session_factory or self._get_default_factory()
+        async with factory() as s:
             updated = await self._refresh(s, batch_size=batch_size)
             await s.commit()
             return updated

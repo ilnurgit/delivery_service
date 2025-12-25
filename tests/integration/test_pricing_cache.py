@@ -4,7 +4,7 @@ import pytest
 
 from delivery.pricing.services.calculator import CostCalculator
 
-pytestmark = pytest.mark.unit
+pytestmark = pytest.mark.integration
 
 
 class CountingFx:

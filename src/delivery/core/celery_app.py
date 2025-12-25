@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from celery import Celery
 
+from delivery.core.db import models  # noqa: F401
 from delivery.core.settings import settings
 
 celery_app = Celery(

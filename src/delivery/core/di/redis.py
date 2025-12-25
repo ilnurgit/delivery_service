@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from fastapi import Request
 from redis.asyncio import Redis
 
-from delivery.core.redis.client import redis
 
-
-def get_redis() -> Redis:
-    return redis
+def get_redis(request: Request) -> Redis:
+    return request.app.state.redis
