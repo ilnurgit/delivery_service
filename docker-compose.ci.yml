@@ -1,0 +1,68 @@
+services:
+  postgres:
+    environment:
+      POSTGRES_DB: delivery
+      POSTGRES_USER: delivery
+      POSTGRES_PASSWORD: delivery
+    ports: []
+
+  redis:
+    ports: []
+
+  rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports: []
+
+  migrate:
+    env_file: []
+    environment:
+      DATABASE_URL: postgresql+asyncpg://delivery:delivery@postgres:5432/delivery
+      REDIS_URL: redis://redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    env_file: []
+    environment:
+      DATABASE_URL: postgresql+asyncpg://delivery:delivery@postgres:5432/delivery
+      REDIS_URL: redis://redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  celery_worker:
+    env_file: []
+    environment:
+      DATABASE_URL: postgresql+asyncpg://delivery:delivery@postgres:5432/delivery
+      REDIS_URL: redis://redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  celery_beat:
+    env_file: []
+    environment:
+      DATABASE_URL: postgresql+asyncpg://delivery:delivery@postgres:5432/delivery
+      REDIS_URL: redis://redis:6379/0
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672//
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
