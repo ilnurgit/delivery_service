@@ -1,158 +1,225 @@
-# Микросервис для службы международной доставки
+# Delivery Service — микросервис международной доставки
 
-Асинхронный микросервис для регистрации международных посылок и расчёта стоимости доставки.
-Реализован в рамках тестового задания.
-
----
-
-## 🧩 Описание
-
-Сервис позволяет:
-- регистрировать посылки пользователей,
-- хранить типы посылок,
-- рассчитывать стоимость доставки в рублях по курсу USD/RUB,
-- работать без авторизации, используя **HTTP-сессию**,
-- выполнять периодические фоновые задачи,
-- предоставлять REST API и минимальный веб-интерфейс.
-
-Каждый пользователь видит **только свои посылки**, привязанные к его сессии.
+Сервис принимает данные о посылках и рассчитывает стоимость доставки.
+Стек: **Python 3.12+, FastAPI (async), SQLAlchemy (async), PostgreSQL, Redis, Celery, RabbitMQ, Alembic, pytest, uv**.
 
 ---
 
-## ⚙️ Технологический стек
+## Что реализовано по ТЗ
 
-- **Python 3.12**
-- **FastAPI** (async)
-- **SQLAlchemy 2.x (async)**
-- **PostgreSQL**
-- **Redis**
-- **Celery + RabbitMQ**
-- **Alembic**
-- **Pydantic v2**
-- **loguru**
-- **pytest**
-- **docker / docker-compose**
-- **uv**
+### Роуты (API v1)
+
+1) **Регистрация посылки**
+- `POST /api/v1/parcels/`
+- Поля: `title`, `weight_kg`, `parcel_type_code`, `content_usd`
+- Валидация входных данных (Pydantic)
+- Возвращает `id` посылки (UUID), который **доступен только в рамках текущей сессии**
+
+2) **Получить список типов посылок**
+- `GET /api/v1/parcel-types/`
+
+3) **Получить список своих посылок**
+- `GET /api/v1/parcels/?limit=...&offset=...`
+- Фильтры:
+  - `parcel_type_code=...`
+  - `has_cost=true|false`
+- Выводит: все поля + имя типа + стоимость доставки (или “Не рассчитано”)
+
+4) **Получить посылку по id**
+- `GET /api/v1/parcels/{parcel_id}`
+
+### Периодические задачи (Celery)
+
+- Раз в **1 минуту** обновляет курс **USD/RUB** (ЦБ РФ) и кеширует в Redis.
+- Раз в **5 минут** выставляет всем необработанным посылкам `delivery_cost_rub` по формуле ТЗ:
+  ```
+  cost_rub = (weight_kg * 0.5 + content_usd * 0.01) * usd_rub_rate
+  ```
+
+### Ручной запуск задач (для отладки)
+
+- `POST /api/v1/fx/refresh` — инициировать обновление курса
+- `POST /api/v1/parcels/refresh-costs?batch_size=500` — инициировать перерасчёт стоимости посылок
+
+### Мини UI
+
+- `GET /ui` — простая HTML-страница:
+  - создать тип посылки
+  - создать посылку
+  - кнопка “Рассчитать стоимость”
+  - таблица “Мои посылки”
 
 ---
 
-## 📦 Архитектура (кратко)
+## Важное про сессию (без авторизации)
 
-Проект разделён по доменным модулям:
+Авторизации нет по ТЗ. Пользователь определяется по cookie:
 
-```
-delivery/
-├── api/
-├── parcels/
-├── parcel_types/
-├── pricing/
-├── fx/
-├── core/
-└── ui/
-```
+- Cookie: `delivery_session_id`
+- Выставляется middleware при первом запросе (например, на `/health`)
+- Во всех запросах к посылкам используется `request.state.session_id`
+
+Гарантия: **посылки видны только внутри своей сессии** (покрыто тестами).
 
 ---
 
-## 🧠 Основные концепции
+## Типы посылок и соответствие ТЗ
 
-### 🔐 Авторизация
-- Авторизации нет
-- Пользователь определяется по HTTP-сессии (cookie)
+В ТЗ перечислены типы: **«одежда», «электроника», «разное»**.
+В реализации типы сделаны **расширяемыми** и хранятся в таблице `parcel_types` (как требует ТЗ), а тариф вынесен в поля:
 
-### 📦 Посылки
-- название
-- вес
-- тип
-- стоимость содержимого (USD)
-- стоимость доставки (RUB, если рассчитана)
+- `base_price_usd`
+- `price_per_kg_usd`
 
-### 💱 Расчёт доставки
+Это позволяет добавлять/изменять типы **без изменения кода**.
 
+Проект содержит **сид-миграцию** с примерами типов (`DOC`, `BOX`).
+При необходимости типы из ТЗ можно создать через API/UI, например:
+- `CLOTHES` (Одежда)
+- `ELECTRONICS` (Электроника)
+- `OTHER` (Разное)
+
+---
+
+## Про расчёт стоимости: 2 модели в проекте (это нормально)
+
+1) **Расчёт delivery_cost_rub (строго по ТЗ)**
+Используется периодической задачей/ручным refresh:
 ```
 cost_rub = (weight_kg * 0.5 + content_usd * 0.01) * usd_rub_rate
 ```
 
-Курс берётся с https://www.cbr-xml-daily.ru/daily_json.js и кэшируется в Redis.
+2) **Калькулятор /pricing (тарифная модель по типам)**
+- `POST /api/v1/pricing/calculate`
+- Формула:
+```
+amount_usd = base_price_usd + price_per_kg_usd * weight_kg
+```
+- Если `currency=RUB`, конвертирует через FX (кешируется в Redis)
+
+Это сделано так, чтобы:
+- delivery_cost_rub проставлялся “как в ТЗ” (фоновой задачей)
+- при этом был отдельный “калькулятор тарифа” по типам
 
 ---
 
-## 🔁 Периодические задачи
+## Запуск проекта
 
-- Обновление курса USD/RUB
-- Расчёт стоимости доставки для необработанных посылок
-
-Планировщик: **Celery Beat**
-
----
-
-## 🧪 Тестирование
-
-- unit / integration / e2e
-- изоляция через транзакции
-- очистка Redis между тестами
+### 1) Поднять инфраструктуру (Postgres / Redis / RabbitMQ)
 
 ```bash
-uv run pytest
+docker compose up -d
 ```
 
----
+### 2) Настроить окружение
 
-## 🚀 Запуск проекта
+Файл `.env` (пример — см. структуру проекта). Нужны переменные:
 
-### Переменные окружения
+- `database_url`
+- `redis_url`
+- `rabbitmq_url`
 
-```env
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/delivery
-REDIS_URL=redis://localhost:6379/0
-RABBITMQ_URL=amqp://guest:guest@localhost:5672/
-```
+Также в docker-compose используются:
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT`
+- `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS`
 
-### Docker
-
-```bash
-docker compose up --build
-```
-
-### Миграции
+### 3) Миграции
 
 ```bash
 uv run alembic upgrade head
 ```
 
-### Локальный запуск
+### 4) Запуск API
 
 ```bash
 uv run uvicorn delivery.main:app --reload
 ```
 
-Swagger: http://localhost:8000/docs
+Открой:
+- Swagger: `http://127.0.0.1:8000/docs`
+- UI: `http://127.0.0.1:8000/ui`
+- Health: `http://127.0.0.1:8000/health`
 
 ---
 
-## 📡 API
+## Запуск Celery
 
-- `POST /api/v1/parcels/`
-- `GET /api/v1/parcels/`
-- `GET /api/v1/parcels/{id}`
-- `POST /api/v1/parcel-types/`
-- `GET /api/v1/parcel-types/`
+В разных терминалах:
 
----
+### Worker
+```bash
+uv run celery -A delivery.core.celery_app:celery_app worker -l INFO
+```
 
-## 🖥 UI
-
-Минимальный интерфейс доступен по адресу:
-http://localhost:8000/ui
-
----
-
-## ⚠️ Примечание по ТЗ
-
-Типы посылок хранятся в отдельной таблице и сидятся миграцией.
-Решение осознанное и задокументировано.
+### Beat
+```bash
+uv run celery -A delivery.core.celery_app:celery_app beat -l INFO
+```
 
 ---
 
-## 📌 Статус
+## Быстрые примеры запросов (curl)
 
-Базовая версия ТЗ полностью реализована.
+### Создать тип
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/parcel-types/ \
+  -H "Content-Type: application/json" \
+  -d '{"code":"DOC","name":"Documents","base_price_usd":"5.00","price_per_kg_usd":"2.50"}'
+```
+
+### Создать посылку
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/parcels/ \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Passport","parcel_type_code":"DOC","weight_kg":2,"content_usd":"100.00"}'
+```
+
+### Список посылок (пагинация)
+```bash
+curl "http://127.0.0.1:8000/api/v1/parcels/?limit=50&offset=0"
+```
+
+### Перерасчёт delivery_cost_rub вручную
+```bash
+curl -X POST "http://127.0.0.1:8000/api/v1/parcels/refresh-costs?batch_size=500"
+```
+
+---
+
+## Ошибки и формат ответов
+
+Единый envelope для ошибок:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Request validation failed",
+    "details": [],
+    "trace_id": "..."
+  }
+}
+```
+
+Также на каждый запрос выставляется:
+- Header: `X-Trace-Id`
+- Логи access-log с `trace_id`
+
+---
+
+## Тесты
+
+```bash
+uv run pytest -q
+```
+
+Есть:
+- unit
+- integration (ASGI in-process + DB/Redis)
+- e2e
+
+---
+
+## Известные предупреждения
+
+- `SAWarning: transaction already deassociated from connection` — допускается (не блокирует сдачу), можно не устранять по договорённости.
