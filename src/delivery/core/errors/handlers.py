@@ -10,6 +10,9 @@ _APP_ERROR_STATUS: dict[str, int] = {
     # parcel types
     "parcel_type_not_found": status.HTTP_404_NOT_FOUND,
     "parcel_type_already_exists": status.HTTP_409_CONFLICT,
+    # parcels
+    "parcel_not_found": status.HTTP_404_NOT_FOUND,
+    "parcel_weight_must_be_positive": status.HTTP_422_UNPROCESSABLE_CONTENT,
 }
 
 

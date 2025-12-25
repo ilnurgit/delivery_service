@@ -52,6 +52,6 @@ async def test_parcel_id_is_scoped_to_session(app):
         assert r.status_code == 404, r.text
         body = r.json()
         assert "error" in body
-        assert body["error"]["code"] == "http_error"
+        assert body["error"]["code"] == "parcel_not_found"
         assert body["error"]["trace_id"] is not None
-        assert body["error"]["details"]["detail"] == "Parcel not found"
+        assert body["error"]["details"]["parcel_id"] == parcel_id

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from delivery.core.di.parcels import get_parcel_service
 from delivery.core.di.session import get_session_id
 from delivery.parcels.api.mappers import to_parcel_out, to_parcel_out_list
 from delivery.parcels.api.schemas import ParcelCreate, ParcelOut
+from delivery.parcels.domain.errors import ParcelNotFoundError
 from delivery.parcels.services.service import ParcelService
 
 router = APIRouter(prefix="/parcels", tags=["parcels"])
@@ -41,7 +42,7 @@ async def get_parcel(
 ) -> ParcelOut:
     parcel = await service.get_parcel(parcel_id=str(parcel_id), session_id=session_id)
     if parcel is None:
-        raise HTTPException(status_code=404, detail="Parcel not found")
+        raise ParcelNotFoundError(str(parcel_id))
     return to_parcel_out(parcel)
 
 

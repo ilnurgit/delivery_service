@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from delivery.core.di.db import get_db_session
 from delivery.parcel_types.api.mappers import to_out, to_out_list
 from delivery.parcel_types.api.schemas import ParcelTypeCreate, ParcelTypeOut
+from delivery.parcel_types.domain.errors import ParcelTypeNotFoundError
 from delivery.parcel_types.repositories.sqlalchemy import SqlAlchemyParcelTypeRepository
 from delivery.parcel_types.services.service import ParcelTypeService
 
@@ -40,5 +41,5 @@ async def create_type(
 async def get_type(code: str, service: ParcelTypeService = Depends(get_service)) -> ParcelTypeOut:
     pt = await service.get_type(code=code)
     if pt is None:
-        raise HTTPException(status_code=404, detail="Parcel type not found")
+        raise ParcelTypeNotFoundError(code)
     return to_out(pt)
