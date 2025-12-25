@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ "dev", "main" ]
+    branches: ["dev", "main"]
   pull_request:
-    branches: [ "dev", "main" ]
+    branches: ["dev", "main"]
 
 jobs:
   lint-and-tests:
@@ -15,23 +15,30 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Docker info
-        run: docker version
+      - name: Create .env for docker compose (CI)
+        run: |
+          cat > .env << 'EOF'
+          POSTGRES_DB=delivery
+          POSTGRES_USER=delivery
+          POSTGRES_PASSWORD=delivery
+          POSTGRES_PORT=5434
+
+          RABBITMQ_DEFAULT_USER=guest
+          RABBITMQ_DEFAULT_PASS=guest
+
+          DATABASE_URL=postgresql+asyncpg://delivery:delivery@postgres:5432/delivery
+          REDIS_URL=redis://redis:6379/0
+          RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672//
+          EOF
+          echo "Created .env:"
+          sed -e 's/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=*** /' .env
 
       - name: Build and start services (CI)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            up -d --build \
-            postgres redis rabbitmq migrate api
+          docker compose up -d --build postgres redis rabbitmq migrate api
 
       - name: Show running containers
-        run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            ps
+        run: docker compose ps
 
       - name: Wait for infra to be healthy
         run: |
@@ -51,12 +58,9 @@ jobs:
             sleep 2
           done
 
-      - name: Run pytest
+      - name: Run pytest (inside api container)
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            exec -T \
+          docker compose exec -T \
             -e DATABASE_URL="postgresql+asyncpg://delivery:delivery@postgres:5432/delivery_test" \
             -e REDIS_URL="redis://redis:6379/0" \
             -e RABBITMQ_URL="amqp://guest:guest@rabbitmq:5672//" \
@@ -65,20 +69,9 @@ jobs:
       - name: Dump logs on failure
         if: failure()
         run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            ps
-
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            logs --no-color --tail=300
+          docker compose ps
+          docker compose logs --no-color --tail=300
 
       - name: Shutdown
         if: always()
-        run: |
-          docker compose \
-            -f docker-compose.yml \
-            -f docker-compose.ci.yml \
-            down -v
+        run: docker compose down -v
