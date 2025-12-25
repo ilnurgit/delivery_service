@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 
 from delivery.parcel_types.domain.errors import ParcelTypeNotFoundError
@@ -12,10 +14,15 @@ class ParcelService:
         self._repo = repo
         self._type_repo = type_repo
 
-    async def list_parcels(self) -> list[Parcel]:
-        return await self._repo.list_all()
-
-    async def create_parcel(self, parcel_type_code: str, weight_kg: float) -> Parcel:
+    async def create_parcel(
+        self,
+        *,
+        session_id: str,
+        parcel_type_code: str,
+        title: str,
+        weight_kg: float,
+        content_usd: str,
+    ) -> Parcel:
         if weight_kg <= 0:
             raise ParcelWeightMustBePositiveError(weight_kg)
 
@@ -25,8 +32,33 @@ class ParcelService:
 
         parcel = Parcel(
             id=str(uuid.uuid4()),
+            session_id=session_id,
             parcel_type_id=pt.id,
+            parcel_type_code=pt.code,
+            parcel_type_name=pt.name,
+            title=title,
             weight_kg=weight_kg,
+            content_usd=content_usd,
+            delivery_cost_rub=None,
         )
-
         return await self._repo.create(parcel)
+
+    async def get_parcel(self, *, parcel_id: str, session_id: str) -> Parcel | None:
+        return await self._repo.get_by_id_for_session(parcel_id, session_id)
+
+    async def list_parcels(
+        self,
+        *,
+        session_id: str,
+        limit: int,
+        offset: int,
+        parcel_type_code: str | None,
+        has_cost: bool | None,
+    ) -> list[Parcel]:
+        return await self._repo.list_for_session(
+            session_id,
+            limit=limit,
+            offset=offset,
+            parcel_type_code=parcel_type_code,
+            has_cost=has_cost,
+        )

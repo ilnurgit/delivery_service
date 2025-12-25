@@ -154,6 +154,12 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 
+markers = [
+  "unit: fast tests without IO (no DB/Redis/HTTP)",
+  "integration: ASGI in-process + DB/Redis",
+  "e2e: real server/network smoke/regression",
+]
+
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "session"
 asyncio_default_test_loop_scope = "session"
@@ -169,7 +175,7 @@ testpaths = [
 # Дополнительные опции pytest:
 # -r : показывать короткий отчёт по пропускам/ошибкам
 # -a : показать ВСЕ категории причин (xfail, skip, error, fail)
-addopts = "-ra"
+addopts = "-ra --strict-markers --strict-config"
 
 # Какие файлы считать тестовыми (по шаблону)
 python_files = ["test_*.py"]

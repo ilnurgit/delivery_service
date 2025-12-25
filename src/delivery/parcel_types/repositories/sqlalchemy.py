@@ -3,10 +3,12 @@ from __future__ import annotations
 from decimal import Decimal
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from delivery.parcel_types.db.models import ParcelTypeModel
 from delivery.parcel_types.domain.entities import ParcelType
+from delivery.parcel_types.domain.errors import ParcelTypeAlreadyExistsError
 from delivery.parcel_types.repositories.base import ParcelTypeRepository
 
 
@@ -53,7 +55,19 @@ class SqlAlchemyParcelTypeRepository(ParcelTypeRepository):
             price_per_kg_usd=Decimal(price_per_kg_usd),
         )
         self._session.add(model)
-        await self._session.flush()
+
+        try:
+            await self._session.flush()
+        except IntegrityError as e:
+            # важно: сбрасываем failed-транзакцию
+            await self._session.rollback()
+
+            msg = str(getattr(e, "orig", e))
+            # самый простой и рабочий детектор под твой constraint:
+            if "ix_parcel_types_code" in msg or "Key (code)" in msg:
+                raise ParcelTypeAlreadyExistsError(code) from e
+            raise
+
         return ParcelType(
             id=str(model.id),
             code=model.code,

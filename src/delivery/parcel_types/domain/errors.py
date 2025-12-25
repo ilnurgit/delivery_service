@@ -10,3 +10,12 @@ class ParcelTypeNotFoundError(AppError):
             message="Parcel type not found",
             details={"code": code},
         )
+
+
+class ParcelTypeAlreadyExistsError(AppError):
+    def __init__(self, code: str) -> None:
+        super().__init__(
+            code="parcel_type_already_exists",
+            message="Parcel type already exists",
+            details={"code": code},
+        )

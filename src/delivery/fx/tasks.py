@@ -19,7 +19,7 @@ async def _refresh() -> str:
         await cache.set_rate("USD", "RUB", rate)
         return "ok"
     finally:
-        await redis.aclose()  # важно: закрыть соединения
+        await redis.aclose()
 
 
 @celery_app.task(name="fx.refresh_usd_rub")

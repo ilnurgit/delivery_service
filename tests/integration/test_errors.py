@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 async def test_validation_error_envelope(client):
     r = await client.post(

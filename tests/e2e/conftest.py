@@ -18,7 +18,9 @@ from sqlalchemy.ext.asyncio import (
 
 from delivery.core.redis.client import redis
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
+
+pytestmark = pytest.mark.e2e
 
 
 def _load_env_test() -> None:

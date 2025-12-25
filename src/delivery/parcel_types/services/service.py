@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from delivery.parcel_types.domain.entities import ParcelType
-from delivery.parcel_types.repositories.sqlalchemy import SqlAlchemyParcelTypeRepository
+from delivery.parcel_types.domain.errors import ParcelTypeAlreadyExistsError
+from delivery.parcel_types.repositories.base import ParcelTypeRepository
 
 
 class ParcelTypeService:
-    def __init__(self, repo: SqlAlchemyParcelTypeRepository) -> None:
+    def __init__(self, repo: ParcelTypeRepository) -> None:
         self._repo = repo
 
     async def list_types(self) -> list[ParcelType]:
@@ -17,6 +18,13 @@ class ParcelTypeService:
     async def create_type(
         self, code: str, name: str, base_price_usd: str, price_per_kg_usd: str
     ) -> ParcelType:
+        existing = await self._repo.get_by_code(code)
+        if existing is not None:
+            raise ParcelTypeAlreadyExistsError(code)
+
         return await self._repo.create(
-            code=code, name=name, base_price_usd=base_price_usd, price_per_kg_usd=price_per_kg_usd
+            code=code,
+            name=name,
+            base_price_usd=base_price_usd,
+            price_per_kg_usd=price_per_kg_usd,
         )

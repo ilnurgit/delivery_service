@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.integration
+
 
 async def test_pricing_usd_and_rub(client):
     r = await client.post(
